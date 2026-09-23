@@ -1,0 +1,191 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  DNDC_OFFICIAL
+  AGENCY_ADMIN
+  AGENT
+  LANDLORD
+  TENANT
+  CORPORATE_MANAGER
+}
+
+enum VerificationStatus {
+  PENDING
+  IN_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum ListingType {
+  SALE
+  RENT
+  LEASE
+  CORPORATE_HOUSING
+}
+
+enum PropertyType {
+  APARTMENT
+  VILLA
+  OFFICE
+  WAREHOUSE
+  LAND
+  BASE_CAMP
+}
+
+enum SimandouZone {
+  CONAKRY
+  FORECARIAH_MORIBAYAH
+  KINDIA
+  MAMOU
+  KANKAN
+  KEROUANE
+  BEYLA
+  BOKE
+}
+
+enum PaymentMethod {
+  ORANGE_MONEY
+  MTN_MOMO
+  BANK_TRANSFER
+  CREDIT_CARD
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  REFUNDED
+  DISPUTED
+}
+
+enum AuditAction {
+  USER_LOGIN
+  PROPERTY_CREATED
+  PROPERTY_VERIFIED_DNDC
+  ESCROW_RELEASED
+  LEASE_SIGNED
+  KYC_SUBMITTED
+}
+
+model User {
+  id                String             @id @default(uuid())
+  email             String             @unique
+  phone             String             @unique
+  passwordHash      String
+  fullName          String
+  role              UserRole           @default(TENANT)
+  kycStatus         VerificationStatus @default(PENDING)
+  cniNumber         String?
+  nifNumber         String?            // Pour les Agences (APIP)
+  agencyName        String?
+  avatar            String?
+
+  properties        Property[]
+  leasesAsLandlord  LeaseContract[]    @relation("LandlordLeases")
+  leasesAsTenant    LeaseContract[]    @relation("TenantLeases")
+  payments          Payment[]
+  auditLogs         AuditLog[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model Property {
+  id                    String            @id @default(uuid())
+  title                 String
+  description           String
+  price                 Float
+  currency              String            @default("GNF")
+  listingType           ListingType
+  propertyType          PropertyType
+  simandouZone          SimandouZone?
+  address               String
+  city                  String
+  latitude              Float
+  longitude             Float
+
+  // Filtres Spécifiques Guinée
+  energySources         String[]          // SOLAR, GENERATOR, INVERTER_BATTERY, EDG_STANDARD
+  waterSources          String[]          // BOREHOLE, WATER_TANK, SEG_STANDARD
+  landTitleType         String            // TITRE_FONCIER, ATTESTATION_CESSION, BAIL_EMPHYTEOTIQUE
+  titleNumber           String?           // Numéro Titre Foncier pour DNDC
+  isTitleVerified       Boolean           @default(false)
+  dndcVerificationDate  DateTime?
+  hasElectrifiedFence   Boolean           @default(false)
+  has24hSecurity        Boolean           @default(false)
+  isPavedRoadAccess     Boolean           @default(false)
+
+  // Options SaaS & Marketing
+  isFeatured            Boolean           @default(false)
+  isSimandouSpotlight   Boolean           @default(false)
+  images                String[]
+
+  ownerId               String
+  owner                 User              @relation(fields: [ownerId], references: [id])
+  leases                LeaseContract[]
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+}
+
+model LeaseContract {
+  id             String         @id @default(uuid())
+  propertyId     String
+  property       Property       @relation(fields: [propertyId], references: [id])
+  landlordId     String
+  landlord       User           @relation("LandlordLeases", fields: [landlordId], references: [id])
+  tenantId       String
+  tenant         User           @relation("TenantLeases", fields: [tenantId], references: [id])
+  monthlyRent    Float
+  depositAmount  Float
+  startDate      DateTime
+  endDate        DateTime
+  isActive       Boolean        @default(true)
+  contractPdfUrl String?
+
+  receipts       RentReceipt[]
+  payments       Payment[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model RentReceipt {
+  id              String        @id @default(uuid())
+  leaseContractId String
+  leaseContract   LeaseContract @relation(fields: [leaseContractId], references: [id])
+  periodMonth     Int
+  periodYear      Int
+  amountPaid      Float
+  receiptPdfUrl   String
+  issuedAt        DateTime      @default(now())
+}
+
+model Payment {
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id])
+  leaseContractId String?
+  leaseContract   LeaseContract? @relation(fields: [leaseContractId], references: [id])
+  amount          Float
+  currency        String         @default("GNF")
+  paymentMethod   PaymentMethod
+  transactionRef  String         @unique
+  escrowStatus    EscrowStatus   @default(HELD)
+  isCompleted     Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+}
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  action    AuditAction
+  details   String
+  ipAddress String?
+  createdAt DateTime    @default(now())
+}
