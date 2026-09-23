@@ -25,6 +25,7 @@ import {
   History,
   Lock
 } from 'lucide-react';
+import InteractiveCorridorMap from '../components/InteractiveCorridorMap';
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'PORTAL' | 'BACKOFFICE'>('PORTAL');
@@ -32,6 +33,7 @@ export default function HomePage() {
   const [energyFilter, setEnergyFilter] = useState(false);
   const [waterFilter, setWaterFilter] = useState(false);
   const [verifiedTitleOnly, setVerifiedTitleOnly] = useState(false);
+  const [properties, setProperties] = useState<any[]>([]);
 
   // État Back-Office Admin DNDC & Escrow
   const [dndcPendingProperties, setDndcPendingProperties] = useState([
@@ -43,6 +45,26 @@ export default function HomePage() {
     { id: 'log-1', user: 'Capitaine Mansaré (Admin DNDC)', action: 'PROPERTY_VERIFIED_DNDC', details: 'Validation Titre Foncier TF-10492/Conakry', ip: '197.149.224.12', time: 'Il y a 10 min' },
     { id: 'log-2', user: 'Kaba Immobilier S.A.R.L.', action: 'ESCROW_RELEASED', details: 'Déblocage Séquestre Orange Money 3.500.000 GNF', ip: '197.149.225.88', time: 'Il y a 25 min' },
   ]);
+
+  React.useEffect(() => {
+    const fetchProperties = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/properties');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.data && data.data.length > 0) {
+            setProperties(data.data);
+            return;
+          }
+        }
+      } catch (err) {
+        // Fallback to static mock properties if API server is offline
+      }
+      setProperties(defaultProperties);
+    };
+
+    fetchProperties();
+  }, []);
 
   const handleApproveDNDC = (id: string, titleNo: string) => {
     setDndcPendingProperties(prev => prev.filter(item => item.id !== id));
@@ -59,7 +81,7 @@ export default function HomePage() {
     ]);
   };
 
-  const mockProperties = [
+  const defaultProperties = [
     {
       id: 'prop-1',
       title: 'Villa Duplex de Prestige avec Kit Solaire & Forage Privé',
@@ -284,34 +306,10 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                {[
-                  { code: 'CONAKRY', name: 'Conakry', role: 'Capitale & Hub' },
-                  { code: 'FORECARIAH_MORIBAYAH', name: 'Forécariah', role: 'Port Moribayah' },
-                  { code: 'KINDIA', name: 'Kindia', role: 'Gare Logistique' },
-                  { code: 'MAMOU', name: 'Mamou', role: 'Carrefour Central' },
-                  { code: 'KANKAN', name: 'Kankan', role: 'Hub Haute-Guinée' },
-                  { code: 'KEROUANE', name: 'Kérouané', role: 'Mines Nord' },
-                  { code: 'BEYLA', name: 'Beyla', role: 'Mines Sud' },
-                  { code: 'BOKE', name: 'Boké', role: 'Zone Bauxite' },
-                ].map((node) => (
-                  <button
-                    key={node.code}
-                    onClick={() => setSelectedZone(node.code)}
-                    className={`p-3.5 rounded-xl text-left border transition-all ${
-                      selectedZone === node.code
-                        ? 'bg-guinea-green text-white border-guinea-green shadow-lg scale-105'
-                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-guinea-green'
-                    }`}
-                  >
-                    <MapPin className="w-4 h-4 mb-2 opacity-80" />
-                    <div className="font-extrabold text-sm">{node.name}</div>
-                    <div className={`text-[10px] font-medium mt-0.5 ${selectedZone === node.code ? 'text-emerald-100' : 'text-slate-500'}`}>
-                      {node.role}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              <InteractiveCorridorMap
+                selectedZone={selectedZone}
+                onSelectZone={(zone) => setSelectedZone(zone)}
+              />
             </div>
           </section>
 
@@ -324,7 +322,7 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {mockProperties.map((item) => (
+              {(properties.length > 0 ? properties : defaultProperties).map((item) => (
                 <div key={item.id} className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition duration-300">
                   <div className="relative h-56 bg-slate-200">
                     <img src={item.image} alt={item.title} className="w-full h-full object-cover" />

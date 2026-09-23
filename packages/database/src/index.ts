@@ -1,4 +1,5 @@
 export * from '@banna-immo/common';
+export { PrismaClient } from '@prisma/client';
 
 export interface User {
   id: string;
